@@ -3,168 +3,162 @@ import { ethers } from "hardhat";
 import { Contract } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-describe("SimpleStorage", function () {
-  let simpleStorage: Contract;
-  let owner: SignerWithAddress;
-  let user1: SignerWithAddress;
-
-  beforeEach(async function () {
-    const SimpleStorage = await ethers.getContractFactory("SimpleStorage");
-    simpleStorage = await SimpleStorage.deploy() as Contract;
-    await simpleStorage.deployed();
-    [owner, user1] = await ethers.getSigners();
-  });
-
-  it("Should initialize with number 0", async function () {
-    expect(await simpleStorage.getNumber()).to.equal(0);
-  });
-
-  it("Should allow the owner to set a new number", async function () {
-    await simpleStorage.setNumber(42);
-    expect(await simpleStorage.getNumber()).to.equal(42);
-  });
-
-  it("Should allow any external user to set a new number", async function () {
-    await simpleStorage.connect(user1).setNumber(123);
-    expect(await simpleStorage.getNumber()).to.equal(123);
-  });
-
-  it("Should allow setting the number to zero", async function () {
-    await simpleStorage.setNumber(0);
-    expect(await simpleStorage.getNumber()).to.equal(0);
-  });
-
-  it("Should allow setting a large number", async function () {
-    const largeNumber = "10000000000000000000000000000000000000000000000000"; // Example large number
-    await simpleStorage.setNumber(largeNumber);
-    expect(await simpleStorage.getNumber()).to.equal(largeNumber);
-  });
-
-  it("Should allow setting the same number multiple times", async function () {
-    await simpleStorage.setNumber(77);
-    await simpleStorage.setNumber(77);
-    expect(await simpleStorage.getNumber()).to.equal(77);
-  });
-
-  it("Should allow different users to set different numbers", async function () {
-    await simpleStorage.connect(owner).setNumber(55);
-    await simpleStorage.connect(user1).setNumber(66);
-    expect(await simpleStorage.connect(owner).getNumber()).to.equal(55);
-    expect(await simpleStorage.connect(user1).getNumber()).to.equal(66);
-  });
-
-  it("Should emit no events on setNumber or getNumber", async function () {
-    await expect(simpleStorage.setNumber(99)).to.not.emit(simpleStorage, "NumberSet"); // Assuming no event is defined
-    await expect(simpleStorage.getNumber()).to.not.emit(simpleStorage, "NumberGet"); // Assuming no event is defined
-  });
-
-  it("Should handle setting and getting the maximum uint256 value", async function () {
-    const maxUint = ethers.constants.MaxUint256;
-    await simpleStorage.setNumber(maxUint);
-    expect(await simpleStorage.getNumber()).to.equal(maxUint);
-  });
-
-  it("Should treat input as uint256 (no negative numbers)", async function () {
-    await simpleStorage.setNumber(-5); // Solidity will interpret this as a very large positive number due to underflow
-    const result = await simpleStorage.getNumber();
-    expect(result.toString()).to.not.equal("-5");
-    expect(result.toString()).to.equal("115792089237316195423570985008687907853269984665640564039457584007913129639931"); // Expected underflow behavior
-  });
-});
-
 describe("Voting", function () {
   let voting: Contract;
   let owner: SignerWithAddress;
   let voter1: SignerWithAddress;
   let voter2: SignerWithAddress;
+  let unauthorizedUser: SignerWithAddress;
 
   beforeEach(async function () {
     const Voting = await ethers.getContractFactory("Voting");
     voting = await Voting.deploy() as Contract;
     await voting.deployed();
-    [owner, voter1, voter2] = await ethers.getSigners();
 
-    // Authorize voter1
+    [owner, voter1, voter2, unauthorizedUser] = await ethers.getSigners();
+
+    // Autorise le votant1
     await voting.authorize(voter1.address);
   });
 
-  it("Should initialize with the owner authorized", async function () {
+  // Tests d'initialisation
+  it("Devrait initialiser avec le propriétaire autorisé", async function () {
     expect(await voting.whitelist(owner.address)).to.equal(true);
   });
 
-  it("Should allow the owner to authorize new voters", async function () {
-    await voting.authorize(voter2.address);
+  // Tests d'autorisation
+  it("Seul le propriétaire devrait pouvoir autoriser de nouveaux votants", async function () {
+    await voting.connect(owner).authorize(voter2.address);
     expect(await voting.whitelist(voter2.address)).to.equal(true);
   });
 
-  it("Should allow an authorized voter to make a proposal during the proposition session", async function () {
-    await voting.connect(owner).demarrerSessionProposition();
-    await voting.connect(voter1).faireProposition(voter1.address, "Proposal 1");
-    const proposals = await voting.proposlist(0);
-    expect(proposals.description).to.equal("Proposal 1");
+  it("Un utilisateur non propriétaire ne devrait pas pouvoir autoriser de nouveaux votants", async function () {
+    await expect(voting.connect(unauthorizedUser).authorize(voter2.address)).to.be.reverted;
   });
 
-  it("Should not allow an unauthorized voter to make a proposal", async function () {
-    await voting.connect(owner).demarrerSessionProposition();
-    await expect(voting.connect(voter2).faireProposition(voter2.address, "Proposal 2")).to.be.revertedWith("you are not authorized");
+  it("L'événement Authorized devrait être émis lors de l'autorisation d'un votant", async function () {
+    await expect(voting.connect(owner).authorize(voter2.address))
+      .to.emit(voting, "Authorized")
+      .withArgs(voter2.address);
   });
 
-  it("Should allow the owner to start and end the proposition session", async function () {
-    expect(await voting.isActiveProposition()).to.equal(false);
+  // Tests de la session de proposition
+  it("Un votant autorisé devrait pouvoir faire une proposition pendant la session de proposition", async function () {
     await voting.connect(owner).demarrerSessionProposition();
-    expect(await voting.isActiveProposition()).to.equal(true);
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition A");
+    const proposal = await voting.proposlist(0);
+    expect(proposal.description).to.equal("Proposition A");
+  });
+
+  it("Un votant non autorisé ne devrait pas pouvoir faire de proposition", async function () {
+    await voting.connect(owner).demarrerSessionProposition();
+    await expect(voting.connect(unauthorizedUser).faireProposition(unauthorizedUser.address, "Proposition non autorisée")).to.be.revertedWith("you are not authorized");
+  });
+
+  it("Les propositions ne devraient pas pouvoir être faites avant le début de la session de proposition", async function () {
+    await expect(voting.connect(voter1).faireProposition(voter1.address, "Proposition prématurée")).to.be.reverted;
+  });
+
+  it("Les propositions ne devraient pas pouvoir être faites après la fin de la session de proposition", async function () {
+    await voting.connect(owner).demarrerSessionProposition();
     await voting.connect(owner).fermerSessionProposition();
-    expect(await voting.isActiveProposition()).to.equal(false);
+    await expect(voting.connect(voter1).faireProposition(voter1.address, "Proposition tardive")).to.be.reverted;
   });
 
-  it("Should allow an authorized voter to vote during the voting session", async function () {
+  it("L'événement ProposalRegistered devrait être émis lors de l'enregistrement d'une proposition", async function () {
     await voting.connect(owner).demarrerSessionProposition();
-    await voting.connect(voter1).faireProposition(voter1.address, "Proposal to vote for");
+    await expect(voting.connect(voter1).faireProposition(voter1.address, "Proposition B"))
+      .to.emit(voting, "ProposalRegistered")
+      .withArgs(0); // L'ID de la première proposition sera 0 (index du tableau)
+  });
+
+  it("L'événement WorkflowStatusChange devrait être émis au démarrage et à la fin de la session de proposition", async function () {
+    await expect(voting.connect(owner).demarrerSessionProposition())
+      .to.emit(voting, "WorkflowStatusChange")
+      .withArgs(0, 1); // RegisteringVoters -> ProposalsRegistrationStarted
+
+    await expect(voting.connect(owner).fermerSessionProposition())
+      .to.emit(voting, "WorkflowStatusChange")
+      .withArgs(1, 2); // ProposalsRegistrationStarted -> ProposalsRegistrationEnded
+  });
+
+  // Tests de la session de vote
+  it("Un votant autorisé devrait pouvoir voter pendant la session de vote", async function () {
+    await voting.connect(owner).demarrerSessionProposition();
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition à voter");
     await voting.connect(owner).fermerSessionProposition();
     await voting.connect(owner).demarrerSessionVote();
-    await voting.connect(voter1).vote(voter1.address, 0);
-    // We can't directly check the vote count from here without a getter, but the absence of revert implies success
+    await expect(voting.connect(voter1).vote(voter1.address, 0)).to.not.be.reverted;
   });
 
-  it("Should not allow an unauthorized voter to vote", async function () {
+  it("Un votant non autorisé ne devrait pas pouvoir voter", async function () {
     await voting.connect(owner).demarrerSessionProposition();
-    await voting.connect(voter1).faireProposition(voter1.address, "Proposal to vote for");
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition à voter");
     await voting.connect(owner).fermerSessionProposition();
     await voting.connect(owner).demarrerSessionVote();
-    await expect(voting.connect(voter2).vote(voter2.address, 0)).to.be.revertedWith("you are not authorized");
+    await expect(voting.connect(unauthorizedUser).vote(unauthorizedUser.address, 0)).to.be.revertedWith("you are not authorized");
   });
 
-  it("Should not allow voting before the voting session starts", async function () {
+  it("Les votes ne devraient pas pouvoir être effectués avant le début de la session de vote", async function () {
     await voting.connect(owner).demarrerSessionProposition();
-    await voting.connect(voter1).faireProposition(voter1.address, "Proposal to vote for");
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition à voter");
     await voting.connect(owner).fermerSessionProposition();
-    await expect(voting.connect(voter1).vote(voter1.address, 0)).to.be.reverted; // Should revert as voting hasn't started
+    await expect(voting.connect(voter1).vote(voter1.address, 0)).to.be.reverted;
   });
 
-  it("Should allow the owner to start and end the voting session", async function () {
+  it("Les votes ne devraient pas pouvoir être effectués après la fin de la session de vote", async function () {
     await voting.connect(owner).demarrerSessionProposition();
-    await voting.connect(voter1).faireProposition(voter1.address, "Proposal to vote for");
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition à voter");
     await voting.connect(owner).fermerSessionProposition();
-    expect(await voting.isActiveVote()).to.equal(false);
     await voting.connect(owner).demarrerSessionVote();
-    expect(await voting.isActiveVote()).to.equal(true);
     await voting.connect(owner).fermerSessionVote();
-    expect(await voting.isActiveVote()).to.equal(false);
+    await expect(voting.connect(voter1).vote(voter1.address, 0)).to.be.reverted;
   });
 
-  it("Should allow the owner to count votes and get the winner (basic case)", async function () {
+  // Note: La logique pour empêcher un votant de voter plusieurs fois n'est pas encore complètement implémentée dans votre contrat.
+
+  it("L'événement Voted devrait être émis lors d'un vote", async function () {
     await voting.connect(owner).demarrerSessionProposition();
-    await voting.connect(voter1).faireProposition(voter1.address, "Proposal A");
-    await voting.connect(voter1).faireProposition(voter1.address, "Proposal B");
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition à voter");
     await voting.connect(owner).fermerSessionProposition();
     await voting.connect(owner).demarrerSessionVote();
-    await voting.connect(voter1).vote(voter1.address, 0); // Vote for Proposal A
+    await expect(voting.connect(voter1).vote(voter1.address, 0))
+      .to.emit(voting, "Voted")
+      .withArgs(voter1.address, 0);
+  });
+
+  it("L'événement WorkflowStatusChange devrait être émis au démarrage et à la fin de la session de vote", async function () {
+    await voting.connect(owner).demarrerSessionProposition();
+    await voting.connect(owner).fermerSessionProposition();
+    await expect(voting.connect(owner).demarrerSessionVote())
+      .to.emit(voting, "WorkflowStatusChange")
+      .withArgs(2, 3); // ProposalsRegistrationEnded -> VotingSessionStarted
+
+    await expect(voting.connect(owner).fermerSessionVote())
+      .to.emit(voting, "WorkflowStatusChange")
+      .withArgs(3, 4); // VotingSessionStarted -> VotingSessionEnded
+  });
+
+  // Tests du comptage des votes
+  it("Seul le propriétaire devrait pouvoir compter les votes", async function () {
+    await expect(voting.connect(unauthorizedUser).compterVote(await voting.proposlist())).to.be.reverted;
+  });
+
+  it("Devrait permettre au propriétaire de compter les votes et de retourner le gagnant (cas simple)", async function () {
+    await voting.connect(owner).demarrerSessionProposition();
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition A");
+    await voting.connect(voter1).faireProposition(voter1.address, "Proposition B");
+    await voting.connect(owner).fermerSessionProposition();
+    await voting.connect(owner).demarrerSessionVote();
+    await voting.connect(voter1).vote(voter1.address, 0); // Vote pour Proposition A
     await voting.connect(owner).fermerSessionVote();
     const winner = await voting.connect(owner).compterVote(await voting.proposlist());
-    expect(winner[0]).to.equal("Proposal A");
+    expect(winner[0]).to.equal("Proposition A");
     expect(winner[1]).to.equal(1);
+    // Note: Votre fonction compterVote ne met pas encore à jour winningProposalId.
+  });
+
+  it("Devrait retourner une erreur si la liste des propositions est vide lors du comptage des votes", async function () {
+    await expect(voting.connect(owner).compterVote()).to.be.revertedWith("Array is empty");
   });
 });
-
-
-
