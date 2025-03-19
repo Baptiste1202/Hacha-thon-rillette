@@ -10,6 +10,7 @@ import {
 } from 'wagmi/chains';
 import { alchemyProvider } from 'wagmi/providers/alchemy';
 import { publicProvider } from 'wagmi/providers/public';
+import "./output.css";
 
 const { chains, publicClient } = configureChains(
   [hardhat],

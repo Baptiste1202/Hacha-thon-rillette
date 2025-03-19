@@ -39,17 +39,18 @@ export default function Home() {
 
   return (
     <>
-    <div className='flex flex-col gap-8 h-screen justify-center items-center'><ConnectButton />
-    Je l'ai mis au milieu (derien)</div>
-      
+        <div className="bg-red-600">
+            <ConnectButton />
+        </div>
       {isConnected ? (
         <div>
           <p><button onClick={getTheNumber}>Get The Number</button> : {getNumber}</p>
           <p><input type="number" onChange={(e) => setSetNumber(e.target.value)} /> <button onClick={changeNumber}>Change the number</button></p>
         </div>
       ) : (
-     //   <p>Please connect your Wallet to our DApp.</p>
-     <></>
+        <div className="red">
+          <p>Please connecta your Wallet to our DApp.</p>
+        </div>
       )}
     </>
   )
