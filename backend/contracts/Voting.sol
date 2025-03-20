@@ -1,6 +1,20 @@
 pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/access/Ownable.sol";
+ 
 contract Voting is Ownable {
+
+    uint winningProposalId;
+    bool isActiveProposition = false;
+    bool isActiveVote = false;
+
+    mapping(address => bool) whitelist; 
+    Proposal[] public proposlist;
+
+    event VoterRegistered(address voterAddress);
+    event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
+    event ProposalRegistered(uint proposalId);
+    event Voted (address voter, uint proposalId);
+    event Authorized(address _address);
 
    struct Voter {
         bool isRegistered;
@@ -21,19 +35,6 @@ contract Voting is Ownable {
         VotingSessionEnded,
         VotesTallied
     }
-
-    uint winningProposalId;
-    bool isActiveProposition = false;
-    bool isActiveVote = false;
-
-    mapping(address => bool) whitelist; 
-    Proposal[] public proposlist;
-
-    event VoterRegistered(address voterAddress);
-    event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
-    event ProposalRegistered(uint proposalId);
-    event Voted (address voter, uint proposalId);
-    event Authorized(address _address);
 
     constructor() Ownable(msg.sender){
         whitelist[msg.sender]= true;
@@ -91,7 +92,7 @@ contract Voting is Ownable {
         }
     }
 
-    function vote(Voter memory _voter, uint _propositionId) public check{
+    function vote(Voter memory _voter, uint _propositionId) public check {
         if (_voter.isRegistered){
             if (!_voter.hasVoted){
                 _voter.hasVoted = true;
@@ -101,7 +102,7 @@ contract Voting is Ownable {
         }
     }
 
-    function getMeilleurVote(proposlist) internal onlyOwner returns (Voter memory){
+    function compterVote(proposlist) internal onlyOwner returns (string memory, uint){
         require(proposlist.length > 0, "Array is empty");
         uint max = 0;
         uint topIndex = 0;
@@ -111,29 +112,6 @@ contract Voting is Ownable {
                 topIndex = i;
             }
         }
-        return (proposlist[topIndex]);
-    }
-
-    function watchVote() public view returns (Proposal[] memory, address[] memory, uint[] memory) {
-        Proposal[] memory proposals = proposlist;
-        if (whitelist[msg.sender]) {
-            address[] memory votersList = new address[](proposlist.length);
-            uint[] memory votedProposalIds = new uint[](proposlist.length);
-            uint index = 0;
-
-            for (uint i = 0; i < proposlist.length; i++) {
-                for (uint j = 0; j < proposlist.length; j++) {
-                    if (voters[j].hasVoted) {
-                        votersList[index] = address(j);
-                        votedProposalIds[index] = voters[j].votedProposalId;
-                        index++;
-                    }
-                }
-            }
-            return (proposals, votersList, votedProposalIds);
-        } else {
-            Proposal[] memory winner = new Proposal[](1);
-            winner , new uint );
-        }
+        return (proposlist[topIndex].description, proposlist[topIndex].voteCount);
     }
 }
