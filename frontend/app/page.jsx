@@ -1,5 +1,6 @@
 "use client"
-
+// Dans app/page.tsx ou tout autre composant qui interagit avec le contrat
+import VotingContractABI from "@/lib/VotingContractABI.json";
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -7,6 +8,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 export default function Home() {
   const router = useRouter()
+  // Puis utilisez-le pour créer une instance du contrat
+  const contract = new ethers.Contract(
+    VotingContractABI,
+  );
 
   useEffect(() => {
     // Redirect to dashboard on initial load
@@ -35,4 +40,6 @@ export default function Home() {
     </div>
   )
 }
+
+
 

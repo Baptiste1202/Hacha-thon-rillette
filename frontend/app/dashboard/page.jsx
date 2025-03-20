@@ -9,10 +9,16 @@ import { AdminPanel } from "@/components/admin-panel"
 import { VoterRegistration } from "@/components/voter-registration"
 import { ProposalSubmission } from "@/components/proposal-submission"
 import { ResultsDisplay } from "@/components/results-display"
+import VotingContractABI from "@/lib/VotingContractABI.json";
 
 export default function Dashboard() {
   const { currentAccount, isAdmin, connectWallet, votingState } = useVotingSystem()
   const [activeTab, setActiveTab] = useState("overview")
+
+  // Puis utilisez-le pour créer une instance du contrat
+  const contract = new ethers.Contract(
+    VotingContractABI,
+  );
 
   // Set the appropriate tab based on voting state
   useEffect(() => {
