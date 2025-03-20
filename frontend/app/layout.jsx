@@ -1,3 +1,4 @@
+import "@/app/output3.css"
 import "@/app/globals.css"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"

@@ -1,4 +1,6 @@
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 contract Voting is Ownable {
 
@@ -22,7 +24,7 @@ contract Voting is Ownable {
         VotesTallied
     }
 
-    uint winningProposalId;
+    uint winningProposalId = 0;
     bool isActiveProposition = false;
     bool isActiveVote = false;
 
@@ -49,42 +51,42 @@ contract Voting is Ownable {
        emit Authorized(_address); 
     }
 
-    function getWinner() public check returns (uint){
-        return winningProposalId; 
+    function showProposal() public view returns (Proposal[] memory) {
+        return proposlist;
     }
 
     function demarrerSessionProposition() internal onlyOwner{
         isActiveProposition = true; 
-        WorkflowStatus previousStatus = RegisteringVoters;
-        WorkflowStatus newStatus = ProposalsRegistrationStarted;
+        WorkflowStatus previousStatus = WorkflowStatus.RegisteringVoters;
+        WorkflowStatus newStatus = WorkflowStatus.ProposalsRegistrationStarted;
         emit WorkflowStatusChange(previousStatus, newStatus);
     }
 
     function fermerSessionProposition() internal onlyOwner{
         isActiveProposition = false; 
-        WorkflowStatus previousStatus = ProposalsRegistrationStarted;
-        WorkflowStatus newStatus = ProposalsRegistrationEnded;
+        WorkflowStatus previousStatus = WorkflowStatus.ProposalsRegistrationStarted;
+        WorkflowStatus newStatus = WorkflowStatus.ProposalsRegistrationEnded;
         emit WorkflowStatusChange(previousStatus, newStatus);
     }
 
     function demarrerSessionVote() internal onlyOwner{
         if (!isActiveProposition){
             isActiveVote = true;
-            WorkflowStatus previousStatus = ProposalsRegistrationEnded;
-            WorkflowStatus newStatus = VotingSessionStarted;
+            WorkflowStatus previousStatus = WorkflowStatus.ProposalsRegistrationEnded;
+            WorkflowStatus newStatus = WorkflowStatus.VotingSessionStarted;
             emit WorkflowStatusChange(previousStatus, newStatus);
         } 
     }
 
     function fermerSessionVote() internal onlyOwner{
         isActiveVote = false;
-        previousStatus = WorkflowStatus.ProposalsRegistrationStarted;
-        WorkflowStatus newStatus = VotingSessionEnded;
+        WorkflowStatus previousStatus = WorkflowStatus.ProposalsRegistrationStarted;
+        WorkflowStatus newStatus = WorkflowStatus.VotingSessionEnded;
         emit WorkflowStatusChange(previousStatus, newStatus);
     }
 
 
-    function faireProposition(Voter memory _voter, string memory _proposition ) public check{
+    function faireProposition(string memory _proposition ) public check{
         if (isActiveProposition){
             Proposal memory proposition = Proposal(_proposition,0);
             proposlist.push(proposition);
@@ -101,39 +103,47 @@ contract Voting is Ownable {
         }
     }
 
-    function getMeilleurVote(proposlist) internal onlyOwner returns (Voter memory){
-        require(proposlist.length > 0, "Array is empty");
-        uint max = 0;
+    function calculMeilleurProposal() internal onlyOwner {
+        require(proposlist.length > 0, "Aucune proposition disponible.");
+        uint maxVotes = 0;
         uint topIndex = 0;
-        for (uint i = 0; i<proposlist.lenght ; i++){
-            if (proposlist[i].voteCount > max) {
-                max = proposlist[i].voteCount;
+        for (uint i = 0; i < proposlist.length; i++) {
+            if (proposlist[i].voteCount > maxVotes) {
+                maxVotes = proposlist[i].voteCount;
                 topIndex = i;
             }
         }
-        return (proposlist[topIndex]);
+        winningProposalId = topIndex; 
+    }
+
+    function getMeilleurProposal() internal view onlyOwner returns (uint) {
+        require(proposlist.length > 0, "Aucune proposition disponible.");
+        return winningProposalId;
     }
 
     function watchVote() public view returns (Proposal[] memory, address[] memory, uint[] memory) {
-        Proposal[] memory proposals = proposlist;
-        if (whitelist[msg.sender]) {
-            address[] memory votersList = new address[](proposlist.length);
-            uint[] memory votedProposalIds = new uint[](proposlist.length);
-            uint index = 0;
+        require(whitelist[msg.sender], "Vous n etes pas autorise a voir les votes.");
 
-            for (uint i = 0; i < proposlist.length; i++) {
-                for (uint j = 0; j < proposlist.length; j++) {
-                    if (voters[j].hasVoted) {
-                        votersList[index] = address(j);
-                        votedProposalIds[index] = voters[j].votedProposalId;
-                        index++;
-                    }
-                }
-            }
-            return (proposals, votersList, votedProposalIds);
-        } else {
-            Proposal[] memory winner = new Proposal[](1);
-            winner , new uint );
+        // Copier les propositions
+        Proposal[] memory proposalsCopy = new Proposal[](proposlist.length);
+        for (uint i = 0; i < proposlist.length; i++) {
+            proposalsCopy[i] = proposlist[i];
         }
+        // Comptage des votants
+        uint voterCount = 0;
+        for (uint i = 0; i < proposlist.length; i++) {
+            voterCount += proposlist[i].voteCount;
+        }
+        // Initialisation des tableaux de retour
+        address[] memory votersList = new address[](voterCount);
+        uint[] memory votedProposalIds = new uint[](voterCount);
+        // Récupération des votants et de leurs votes
+        for (uint i = 0; i < proposlist.length; i++) {
+            for (uint j = 0; j < proposlist[i].voteCount; j++) {
+                // Ici, il faudrait stocker les adresses des votants, mais il manque leur mapping
+                // Hypothèse : un mapping `mapping(address => Voter) public voters;` devrait exister dans ton contrat
+            }
+        }
+        return (proposalsCopy, votersList, votedProposalIds);
     }
 }

@@ -1,10 +1,12 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-const SimpleStorageModule = buildModule("SimpleStorageModule", (m) => {
+const votingModule = buildModule("VotingModule", (m) => {
 
-  const simpleStorage = m.contract("SimpleStorage");
+  const voting = m.contract("Voting");
 
-  return { simpleStorage };
+  console.log("Voting contract deployment initiated");
+
+  return { voting };
 });
 
-export default SimpleStorageModule;
+export default votingModule;
