@@ -41,6 +41,10 @@ contract Voting is Ownable {
         whitelist[msg.sender]= true;
     }
 
+    function getOwner() public view returns (address) {
+        return owner();
+    }
+
     modifier check(){
 	   require (whitelist[msg.sender]==true, "you are not authorized");
    _;}

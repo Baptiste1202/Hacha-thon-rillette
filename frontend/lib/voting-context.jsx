@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState } from "react"
+import { ethers } from "ethers";
 
 // Create context
 const VotingSystemContext = createContext(undefined)
@@ -14,7 +15,7 @@ export function VotingSystemProvider({ children }) {
   const [votingState, setVotingState] = useState(0)
 
   // Admin status (first account is admin)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(true)
 
   // Voters list
   const [votersList, setVotersList] = useState([])
@@ -33,19 +34,26 @@ export function VotingSystemProvider({ children }) {
   const isVoter = currentAccount ? votersList.includes(currentAccount) : false
 
   // Connect wallet (mock function)
-  const connectWallet = () => {
-    // Generate a random Ethereum address
-    const randomAddress = `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`
-
-    setCurrentAccount(randomAddress)
-
-    // First account is admin
-    if (votersList.length === 0) {
-      setIsAdmin(true)
-      // Add admin to voters list
-      setVotersList([randomAddress])
+  const connectWallet = async () => {
+    if (!window.ethereum) {
+      console.error("MetaMask non détecté !");
+      return;
     }
-  }
+
+    const [account] = await window.ethereum.request({ method: "eth_requestAccounts" });
+
+    setCurrentAccount(account);
+
+    try {
+        const contract = await ethers.getContract("Voting"); // Récupère le contrat
+        const contractOwner = await contract.owner(); // Récupère l'owner du contrat
+        console.log("Compte connecté :", account);
+        console.log("Propriétaire du contrat :", contractOwner);
+        setIsAdmin(account.toLowerCase() === contractOwner.toLowerCase()); // Vérifie si c'est l'admin
+    } catch (error) {
+        console.error("Erreur lors de la récupération de l'admin :", error);
+    }
+  };
 
   // Admin Functions
   const addVoter = (address) => {
@@ -129,6 +137,7 @@ export function VotingSystemProvider({ children }) {
     endVotingSession,
     tallyVotes,
     winningProposalId,
+    setIsAdmin
   }
 
   return <VotingSystemContext.Provider value={value}>{children}</VotingSystemContext.Provider>

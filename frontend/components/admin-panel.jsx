@@ -1,5 +1,6 @@
 "use client"
 
+import { authorizeVoter, getProposals, isAdmin } from "@/lib/votingService";
 import { useState } from "react"
 import { useVotingSystem } from "@/lib/voting-context"
 import { Button } from "@/components/ui/button"
@@ -8,6 +9,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertCircle, CheckCircle2 } from "@/components/icons"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ContractStatus } from "@/components/contractStatus"
+
+export default function Page() {
+  return (
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-6">Système de Vote Décentralisé</h1>
+      
+      {/* Ajouter le composant de statut du contrat */}
+      <div className="mb-6">
+        <ContractStatus />
+      </div>
+      
+      {/* Reste de votre page */}
+    </div>
+  )
+}
 
 export function AdminPanel() {
   const {
@@ -22,27 +39,21 @@ export function AdminPanel() {
   } = useVotingSystem()
 
   const [newVoterAddress, setNewVoterAddress] = useState("")
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  const [address, setAddress] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const handleAddVoter = () => {
-    if (!newVoterAddress || !newVoterAddress.startsWith("0x") || newVoterAddress.length !== 42) {
-      setError("Adresse Ethereum invalide")
-      return
-    }
-
-    if (votersList.includes(newVoterAddress)) {
-      setError("Cet électeur est déjà enregistré")
-      return
-    }
-
+  const handleAddVoter = async () => {
+    setLoading(true);
     try {
-      addVoter(newVoterAddress)
-      setSuccess(`Électeur ${newVoterAddress} ajouté avec succès`)
-      setNewVoterAddress("")
-      setError("")
+      await authorizeVoter(address);
+      setSuccess(`Électeur ${address} autorisé avec succès`);
+      setAddress("");
     } catch (err) {
-      setError("Erreur lors de l'ajout de l'électeur")
+      setError(`Erreur: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   }
 
