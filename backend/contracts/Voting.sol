@@ -8,6 +8,7 @@ contract Voting is Ownable {
         bool isRegistered;
         bool hasVoted;
         uint votedProposalId;
+        int age;
     }
 
     struct Proposal {
@@ -27,15 +28,18 @@ contract Voting is Ownable {
     uint winningProposalId = 0;
     bool isActiveProposition = false;
     bool isActiveVote = false;
+    int legalAgeToVote; 
 
     mapping(address => bool) whitelist; 
     Proposal[] public proposlist;
+    Voter[] public voters;
 
     event VoterRegistered(address voterAddress);
     event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
     event ProposalRegistered(uint proposalId);
     event Voted (address voter, uint proposalId);
     event Authorized(address _address);
+    event NotAge(Voter _voter);
 
     constructor() Ownable(msg.sender){
         whitelist[msg.sender]= true;
@@ -53,6 +57,10 @@ contract Voting is Ownable {
     function authorize(address _address) public onlyOwner {
        whitelist[_address] = true;
        emit Authorized(_address); 
+    }
+
+    function setLegalAge(int age) private onlyOwner {
+       legalAgeToVote = age;
     }
 
     function showProposal() public view returns (Proposal[] memory) {
@@ -149,5 +157,23 @@ contract Voting is Ownable {
             }
         }
         return (proposalsCopy, votersList, votedProposalIds);
+    }
+
+    function removeVote(Voter memory _voter) public check {
+        require(_voter.hasVoted, "Vous n'avez pas encore vote.");
+        require(isActiveVote, "La session de vote n'est pas active.");
+
+        uint votedProposal = _voter.votedProposalId;
+
+        // Réduction du nombre de votes de la proposition concernée
+        if (proposlist[votedProposal].voteCount > 0) {
+            proposlist[votedProposal].voteCount--;
+        }
+    }
+
+    function controlMajority(Voter memory _voter) public check {
+        if ( _voter.age < legalAgeToVote ){
+            emit NotAge(_voter);
+        }
     }
 }
